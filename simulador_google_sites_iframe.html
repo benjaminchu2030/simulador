@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador DERIVADOS DEL BOSQUE - Sistema Integrado FGR/CETV/Condensados</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #2d5016;
+            --secondary: #8B4513;
+            --accent: #d4a017;
+            --danger: #c0392b;
+            --success: #27ae60;
+            --bg: #f5f5f0;
+            --card: #ffffff;
+            --text: #2c3e50;
+            --border: #dcdcdc;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, #1a3009 100%);
+            color: white;
+            padding: 1.5rem 1rem;
+            text-align: center;
+        }
+        .header h1 { font-size: 1.4rem; margin-bottom: 0.3rem; }
+        .header p { opacity: 0.9; font-size: 0.85rem; }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+            margin: 1rem 0;
+        }
+        @media (min-width: 768px) {
+            .metrics-grid { grid-template-columns: repeat(4, 1fr); }
+            .header h1 { font-size: 1.8rem; }
+        }
+        .metric-card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1rem;
+            border-left: 4px solid var(--accent);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .metric-card.negative { border-left-color: var(--danger); }
+        .metric-card.positive { border-left-color: var(--success); }
+        .metric-label {
+            font-size: 0.7rem;
+            color: #777;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.2rem;
+        }
+        .metric-value {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--text);
+        }
+        .metric-delta {
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+            font-weight: 600;
+        }
+        .delta-positive { color: var(--success); }
+        .delta-negative { color: var(--danger); }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 0.4rem;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+        .fill-thermal { background: linear-gradient(90deg, #e74c3c, #f39c12); }
+        .fill-water { background: linear-gradient(90deg, #3498db, #2ecc71); }
+        .fill-biomass { background: linear-gradient(90deg, #8B4513, #d4a017); }
+
+        .panel {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+            margin-bottom: 1rem;
+        }
+        .panel-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .panel-title::before {
+            content: '';
+            width: 3px;
+            height: 16px;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+
+        .toggle-container {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .toggle-btn {
+            flex: 1;
+            padding: 0.5rem;
+            border: 2px solid var(--border);
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .toggle-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .control-group {
+            margin-bottom: 1rem;
+        }
+        .control-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 0.3rem;
+        }
+        .value-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.2rem;
+        }
+        .current-val {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 0.9rem;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 5px;
+            border-radius: 3px;
+            background: #e0e0e0;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: none;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+        @media (min-width: 768px) {
+            .grid-2 { grid-template-columns: 300px 1fr; }
+        }
+
+        .scenario-comparison {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        @media (min-width: 600px) {
+            .scenario-comparison { grid-template-columns: 1fr 1fr; }
+        }
+        .scenario-box {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1rem;
+            border: 2px solid var(--border);
+            position: relative;
+        }
+        .scenario-box.current { border-color: var(--danger); }
+        .scenario-box.optimized { border-color: var(--success); }
+        .scenario-badge {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .scenario-badge.current { background: #fdeaea; color: var(--danger); }
+        .scenario-badge.optimized { background: #e8f8f0; color: var(--success); }
+        .scenario-title {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            padding-right: 80px;
+        }
+        .scenario-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.4rem 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.85rem;
+        }
+        .scenario-stat:last-child { border-bottom: none; }
+        .stat-name { color: #666; }
+        .stat-val { font-weight: 700; }
+
+        .flow-diagram {
+            text-align: center;
+            padding: 1rem 0;
+        }
+        .flow-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.75rem;
+        }
+        .flow-node {
+            padding: 0.6rem 0.8rem;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            min-width: 100px;
+        }
+        .flow-node.input { background: #e8f4f8; color: #2980b9; border: 2px solid #2980b9; }
+        .flow-node.process { background: #fef9e7; color: #d4a017; border: 2px solid var(--accent); }
+        .flow-node.output { background: #e8f8f0; color: var(--success); border: 2px solid var(--success); }
+        .flow-node.waste { background: #fdeaea; color: var(--danger); border: 2px solid var(--danger); }
+        .flow-node.recovered { background: #f0e6ff; color: #8e44ad; border: 2px solid #8e44ad; }
+        .flow-arrow { font-size: 1.2rem; color: #bbb; }
+        .flow-label {
+            font-size: 0.7rem;
+            color: #888;
+            margin-top: 0.2rem;
+            font-weight: 500;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 0.3rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.3rem;
+            overflow-x: auto;
+        }
+        .tab-btn {
+            padding: 0.5rem 0.8rem;
+            border: none;
+            background: none;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px 6px 0 0;
+            color: #777;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        @media (min-width: 768px) {
+            .charts-row { grid-template-columns: 1fr 1fr; }
+        }
+        .chart-box {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .chart-box canvas { max-height: 250px; }
+
+        .eco-section {
+            background: linear-gradient(135deg, #f8fff8 0%, #f0f8f0 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 2px solid var(--success);
+            margin-bottom: 1rem;
+        }
+        .eco-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        @media (min-width: 600px) {
+            .eco-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        .eco-item {
+            text-align: center;
+            padding: 1rem;
+            background: white;
+            border-radius: 10px;
+        }
+        .eco-icon { font-size: 2rem; margin-bottom: 0.3rem; }
+        .eco-value {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+        .eco-label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.2rem;
+        }
+
+        .report-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 0.5rem;
+            transition: background 0.2s;
+        }
+        .report-btn:hover { background: #1a3009; }
+
+        .sensitivity-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+        .sensitivity-table th {
+            background: var(--primary);
+            color: white;
+            padding: 0.6rem;
+            text-align: left;
+        }
+        .sensitivity-table td {
+            padding: 0.6rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .sensitivity-table tr:hover { background: #f9f9f9; }
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .badge-good { background: #d4edda; color: #155724; }
+        .badge-bad { background: #f8d7da; color: #721c24; }
+        .badge-warn { background: #fff3cd; color: #856404; }
+
+        .report-content {
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            color: #444;
+            background: #fafafa;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .hidden { display: none; }
+
+        /* Responsive iframe friendly */
+        @media (max-width: 400px) {
+            .metrics-grid { grid-template-columns: 1fr 1fr; }
+            .metric-value { font-size: 1.1rem; }
+            .header h1 { font-size: 1.1rem; }
+            .flow-node { min-width: 80px; font-size: 0.7rem; padding: 0.4rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌳 SIMULADOR DERIVADOS DEL BOSQUE</h1>
+        <p>Sistema Integrado FGR + CETV + Recuperación de Condensados</p>
+        <p style="margin-top:0.3rem; font-size:0.8rem; opacity:0.8">Planta Productiva · Chulucanas, Piura</p>
+    </div>
+
+    <div class="container">
+        <!-- KPIs -->
+        <div class="metrics-grid" id="mainKPIs">
+            <div class="metric-card">
+                <div class="metric-label">Eficiencia Térmica</div>
+                <div class="metric-value" id="kpi-thermal">--</div>
+                <div class="metric-delta" id="delta-thermal">--</div>
+                <div class="progress-bar"><div class="progress-fill fill-thermal" id="bar-thermal" style="width:0%"></div></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Consumo de Leña</div>
+                <div class="metric-value" id="kpi-biomass">--</div>
+                <div class="metric-delta" id="delta-biomass">--</div>
+                <div class="progress-bar"><div class="progress-fill fill-biomass" id="bar-biomass" style="width:0%"></div></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Recuperación de Agua</div>
+                <div class="metric-value" id="kpi-water">--</div>
+                <div class="metric-delta" id="delta-water">--</div>
+                <div class="progress-bar"><div class="progress-fill fill-water" id="bar-water" style="width:0%"></div></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Rendimiento</div>
+                <div class="metric-value" id="kpi-yield">--</div>
+                <div class="metric-delta" id="delta-yield">--</div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <!-- Panel de Control -->
+            <div class="panel">
+                <div class="panel-title">Panel de Control</div>
+
+                <div class="toggle-container">
+                    <button class="toggle-btn active" id="btn-current" onclick="setScenario('current')">Sistema Actual</button>
+                    <button class="toggle-btn" id="btn-optimized" onclick="setScenario('optimized')">Con Innovación</button>
+                </div>
+
+                <div class="control-group">
+                    <div class="value-display">
+                        <label>Algarroba (kg/sem)</label>
+                        <span class="current-val" id="val-algarroba">6,600</span>
+                    </div>
+                    <input type="range" id="algarroba" min="3000" max="12000" step="100" value="6600" oninput="updateSimulation()">
+                </div>
+
+                <div class="control-group">
+                    <div class="value-display">
+                        <label>Días Operativos</label>
+                        <span class="current-val" id="val-dias">5.5</span>
+                    </div>
+                    <input type="range" id="dias" min="1" max="7" step="0.5" value="5.5" oninput="updateSimulation()">
+                </div>
+
+                <div class="control-group">
+                    <div class="value-display">
+                        <label>Horas por Turno</label>
+                        <span class="current-val" id="val-horas">8</span>
+                    </div>
+                    <input type="range" id="horas" min="4" max="12" step="1" value="8" oninput="updateSimulation()">
+                </div>
+
+                <div class="control-group">
+                    <div class="value-display">
+                        <label>Eficiencia Térmica Base (%)</label>
+                        <span class="current-val" id="val-eff-base">17.5</span>
+                    </div>
+                    <input type="range" id="eff-base" min="10" max="25" step="0.5" value="17.5" oninput="updateSimulation()">
+                </div>
+
+                <div class="control-group" id="fgr-control" style="opacity:0.5; pointer-events:none;">
+                    <div class="value-display">
+                        <label>Mejora FGR (%)</label>
+                        <span class="current-val" id="val-fgr">40%</span>
+                    </div>
+                    <input type="range" id="fgr-boost" min="0" max="60" step="5" value="40" oninput="updateSimulation()">
+                </div>
+
+                <div class="control-group" id="cetv-control" style="opacity:0.5; pointer-events:none;">
+                    <div class="value-display">
+                        <label>Captación Vapor CETV (%)</label>
+                        <span class="current-val" id="val-cetv">99%</span>
+                    </div>
+                    <input type="range" id="cetv-capture" min="0" max="100" step="1" value="99" oninput="updateSimulation()">
+                </div>
+
+                <div class="control-group" id="cond-control" style="opacity:0.5; pointer-events:none;">
+                    <div class="value-display">
+                        <label>Recuperación Condensados (%)</label>
+                        <span class="current-val" id="val-cond">70%</span>
+                    </div>
+                    <input type="range" id="cond-recovery" min="0" max="90" step="5" value="70" oninput="updateSimulation()">
+                </div>
+
+                <div class="control-group">
+                    <div class="value-display">
+                        <label>Precio Algarrobina (S/kg)</label>
+                        <span class="current-val" id="val-precio">S/22</span>
+                    </div>
+                    <input type="range" id="precio" min="15" max="40" step="1" value="22" oninput="updateSimulation()">
+                </div>
+
+                <div class="control-group">
+                    <div class="value-display">
+                        <label>Costo Leña (S/kg)</label>
+                        <span class="current-val" id="val-lena">S/0.8</span>
+                    </div>
+                    <input type="range" id="lena-cost" min="0.3" max="2" step="0.1" value="0.8" oninput="updateSimulation()">
+                </div>
+
+                <button class="report-btn" onclick="generateReport()">📊 Generar Reporte</button>
+            </div>
+
+            <!-- Panel Principal -->
+            <div>
+                <!-- Comparación -->
+                <div class="scenario-comparison">
+                    <div class="scenario-box current">
+                        <span class="scenario-badge current">Línea Base</span>
+                        <div class="scenario-title">Sistema Actual</div>
+                        <div class="scenario-stat"><span class="stat-name">Eficiencia Térmica</span><span class="stat-val" id="sc-thermal-c">--</span></div>
+                        <div class="scenario-stat"><span class="stat-name">Leña (kg/sem)</span><span class="stat-val" id="sc-biomass-c">--</span></div>
+                        <div class="scenario-stat"><span class="stat-name">Agua Proceso (L/sem)</span><span class="stat-val" id="sc-water-c">--</span></div>
+                        <div class="scenario-stat"><span class="stat-name">Emisiones Vapor</span><span class="stat-val" id="sc-vapor-c">--</span></div>
+                        <div class="scenario-stat"><span class="stat-name">Rendimiento</span><span class="stat-val" id="sc-yield-c">--</span></div>
+                        <div class="scenario-stat"><span class="stat-name">Costo Energía</span><span class="stat-val" id="sc-cost-c">--</span></div>
+                    </div>
+                    <div class="scenario-box optimized">
+                        <span class="scenario-badge optimized">Innovación</span>
+                        <div class="scenario-title">Sistema Optimizado</div>
+                        <div class="scenario-stat"><span class="stat-name">Eficiencia Térmica</span><span class="stat-val" id="sc-thermal-o">--</span></div>
+                        <div class="scenario-stat"><span class="stat-name">Leña (kg/sem)</span><span class="stat-val" id="sc-biomass-o">--</span></div>
+                        <div class="scenario-stat"><span class="stat-name">Agua Externa (L/sem)</span><span class="stat-val" id="sc-water-o">--</span></div>
+                        <div class="scenario-stat"><span class="stat-name">Emisiones Residuales</span><span class="stat-val" id="sc-vapor-o">--</span></div>
+                        <div class="scenario-stat"><span class="stat-name">Rendimiento</span><span class="stat-val" id="sc-yield-o">--</span></div>
+                        <div class="scenario-stat"><span class="stat-name">Costo Energía</span><span class="stat-val" id="sc-cost-o">--</span></div>
+                    </div>
+                </div>
+
+                <!-- Diagrama de Flujo -->
+                <div class="panel">
+                    <div class="panel-title">Diagrama de Flujo</div>
+                    <div class="flow-diagram">
+                        <div class="flow-row">
+                            <div class="flow-node input">
+                                <div>🌿 Algarroba</div>
+                                <div class="flow-label" id="flow-algarroba">6,600 kg/sem</div>
+                            </div>
+                            <div class="flow-arrow">→</div>
+                            <div class="flow-node process">
+                                <div>🔥 Cocción</div>
+                                <div class="flow-label" id="flow-coccion">4 cocinas</div>
+                            </div>
+                            <div class="flow-arrow">→</div>
+                            <div class="flow-node output">
+                                <div>🍯 Algarrobina</div>
+                                <div class="flow-label" id="flow-producto">2,700 kg/sem</div>
+                            </div>
+                        </div>
+                        <div class="flow-row">
+                            <div class="flow-node input">
+                                <div>💧 Agua</div>
+                                <div class="flow-label" id="flow-agua">13,000 L/sem</div>
+                            </div>
+                            <div class="flow-arrow">→</div>
+                            <div class="flow-node process">
+                                <div>♻️ FGR+CETV</div>
+                                <div class="flow-label" id="flow-fgr">Activo</div>
+                            </div>
+                            <div class="flow-arrow">→</div>
+                            <div class="flow-node recovered">
+                                <div>💧 Agua Rec.</div>
+                                <div class="flow-label" id="flow-recovered">0 L/sem</div>
+                            </div>
+                            <div class="flow-arrow">→</div>
+                            <div class="flow-node waste">
+                                <div>🌫️ Emisiones</div>
+                                <div class="flow-label" id="flow-emisiones">15,840 L/sem</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="tab-buttons">
+                    <button class="tab-btn active" onclick="showTab('charts')">📈 Gráficos</button>
+                    <button class="tab-btn" onclick="showTab('economics')">🔄 Eco. Circular</button>
+                    <button class="tab-btn" onclick="showTab('sensitivity')">📉 Sensibilidad</button>
+                    <button class="tab-btn" onclick="showTab('report')">📋 Reporte</button>
+                </div>
+
+                <div class="tab-content active" id="tab-charts">
+                    <div class="charts-row">
+                        <div class="chart-box"><canvas id="chart-efficiency"></canvas></div>
+                        <div class="chart-box"><canvas id="chart-water"></canvas></div>
+                    </div>
+                    <div class="charts-row">
+                        <div class="chart-box"><canvas id="chart-biomass"></canvas></div>
+                        <div class="chart-box"><canvas id="chart-cost"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-economics">
+                    <div class="eco-section">
+                        <div class="panel-title">🔄 Impacto en Economía Circular</div>
+                        <div class="eco-grid">
+                            <div class="eco-item">
+                                <div class="eco-icon">🌳</div>
+                                <div class="eco-value" id="eco-trees">--</div>
+                                <div class="eco-label">Árboles ahorrados/mes</div>
+                            </div>
+                            <div class="eco-item">
+                                <div class="eco-icon">💧</div>
+                                <div class="eco-value" id="eco-water">--</div>
+                                <div class="eco-label">Litros agua recuperados/año</div>
+                            </div>
+                            <div class="eco-item">
+                                <div class="eco-icon">🌱</div>
+                                <div class="eco-value" id="eco-carbon">--</div>
+                                <div class="eco-label">kg CO₂ evitados/año</div>
+                            </div>
+                        </div>
+                        <div style="margin-top:1rem; padding:0.75rem; background:white; border-radius:8px;">
+                            <h4 style="margin-bottom:0.5rem; color:var(--primary); font-size:0.9rem;">Principios Aplicados:</h4>
+                            <ul style="margin-left:1.2rem; color:#555; font-size:0.85rem;">
+                                <li><strong>Cierre de bucles:</strong> Agua recirculada al 70%, gases recirculados vía FGR</li>
+                                <li><strong>Eficiencia:</strong> Reducción 18% leña, alargando vida útil del bosque seco</li>
+                                <li><strong>Valorización:</strong> Vapor → agua tratada (NTS 173-MINSA) reutilizable</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-sensitivity">
+                    <div class="panel">
+                        <div class="panel-title">📈 Análisis de Sensibilidad</div>
+                        <p style="color:#777; font-size:0.8rem; margin-bottom:0.75rem;">Impacto en ahorro anual al variar ±20% los parámetros clave</p>
+                        <div style="overflow-x:auto;">
+                            <table class="sensitivity-table">
+                                <thead>
+                                    <tr><th>Parámetro</th><th>-20%</th><th>Base</th><th>+20%</th><th>Sens.</th></tr>
+                                </thead>
+                                <tbody id="sensitivity-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-report">
+                    <div class="panel">
+                        <div class="panel-title">📋 Reporte de Simulación</div>
+                        <div class="report-content" id="report-content">Presiona "Generar Reporte" para crear el análisis completo...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Estado
+        let currentScenario = 'optimized';
+        let charts = {};
+
+        const BASE = {
+            algarroba: 6600, dias: 5.5, horas: 8, effThermal: 17.5,
+            yieldRate: 40.9, waterPerKg: 1.97, lenaRatio: 1.0,
+            lenaCost: 0.8, precio: 22, fgrBoost: 40, cetvCapture: 99,
+            condRecovery: 70, vaporEvapRate: 2.4, co2PerKgLena: 1.8,
+            treesPerMonth: 19
+        };
+
+        function fmt(n, d=0) {
+            return n.toLocaleString('es-PE', {minimumFractionDigits:d, maximumFractionDigits:d});
+        }
+
+        function setScenario(s) {
+            currentScenario = s;
+            document.getElementById('btn-current').classList.toggle('active', s==='current');
+            document.getElementById('btn-optimized').classList.toggle('active', s==='optimized');
+
+            const ids = ['fgr-control','cetv-control','cond-control'];
+            const vals = s==='current' ? [0,0,0] : [BASE.fgrBoost, BASE.cetvCapture, BASE.condRecovery];
+            const inputs = ['fgr-boost','cetv-capture','cond-recovery'];
+
+            ids.forEach((id,i) => {
+                const el = document.getElementById(id);
+                el.style.opacity = s==='current' ? '0.5' : '1';
+                el.style.pointerEvents = s==='current' ? 'none' : 'auto';
+            });
+            inputs.forEach((id,i) => document.getElementById(id).value = vals[i]);
+            updateSimulation();
+        }
+
+        function calc(algarroba, dias, horas, effBase, fgrBoost, cetvCapture, condRecovery, precio, lenaCost) {
+            const producto = algarroba * (BASE.yieldRate / 100);
+            const effThermal = effBase * (1 + fgrBoost / 100);
+            const lenaBase = producto * BASE.lenaRatio;
+            const lenaActual = lenaBase * (BASE.effThermal / effThermal);
+            const lenaAhorro = lenaBase - lenaActual;
+            const aguaTotal = algarroba * BASE.waterPerKg;
+            const vaporGenerado = algarroba * BASE.vaporEvapRate;
+            const vaporCapturado = vaporGenerado * (cetvCapture / 100);
+            const aguaRecuperada = vaporCapturado * (condRecovery / 100);
+            const aguaExterna = Math.max(0, aguaTotal - aguaRecuperada);
+            const emisiones = vaporGenerado - vaporCapturado;
+            const costoLena = lenaActual * lenaCost;
+            const costoAgua = aguaExterna * 0.05;
+            const costoTotal = costoLena + costoAgua;
+            const ingresos = producto * precio;
+            const co2Emitido = lenaActual * BASE.co2PerKgLena;
+            const co2Ahorrado = lenaAhorro * BASE.co2PerKgLena;
+            const factorEscala = lenaAhorro / (producto * BASE.lenaRatio * 0.18);
+            const arbolesAhorrados = BASE.treesPerMonth * factorEscala;
+            return {algarroba, producto, effThermal, lenaActual, lenaAhorro, aguaTotal, aguaRecuperada, aguaExterna, vaporGenerado, vaporCapturado, emisiones, costoTotal, ingresos, co2Emitido, co2Ahorrado, arbolesAhorrados, dias, horas};
+        }
+
+        function updateSimulation() {
+            const algarroba = parseInt(document.getElementById('algarroba').value);
+            const dias = parseFloat(document.getElementById('dias').value);
+            const horas = parseInt(document.getElementById('horas').value);
+            const effBase = parseFloat(document.getElementById('eff-base').value);
+            const fgrBoost = parseFloat(document.getElementById('fgr-boost').value);
+            const cetvCapture = parseFloat(document.getElementById('cetv-capture').value);
+            const condRecovery = parseFloat(document.getElementById('cond-recovery').value);
+            const precio = parseFloat(document.getElementById('precio').value);
+            const lenaCost = parseFloat(document.getElementById('lena-cost').value);
+
+            document.getElementById('val-algarroba').textContent = fmt(algarroba);
+            document.getElementById('val-dias').textContent = dias;
+            document.getElementById('val-horas').textContent = horas;
+            document.getElementById('val-eff-base').textContent = effBase;
+            document.getElementById('val-fgr').textContent = fgrBoost + '%';
+            document.getElementById('val-cetv').textContent = cetvCapture + '%';
+            document.getElementById('val-cond').textContent = condRecovery + '%';
+            document.getElementById('val-precio').textContent = 'S/' + precio;
+            document.getElementById('val-lena').textContent = 'S/' + lenaCost;
+
+            const current = calc(algarroba, dias, horas, effBase, 0, 0, 0, precio, lenaCost);
+            const optimized = calc(algarroba, dias, horas, effBase, fgrBoost, cetvCapture, condRecovery, precio, lenaCost);
+            const active = currentScenario === 'current' ? current : optimized;
+
+            document.getElementById('kpi-thermal').textContent = active.effThermal.toFixed(1) + '%';
+            document.getElementById('bar-thermal').style.width = Math.min(active.effThermal, 100) + '%';
+            const dEff = active.effThermal - current.effThermal;
+            document.getElementById('delta-thermal').innerHTML = dEff >= 0 ? `<span class="delta-positive">▲ +${dEff.toFixed(1)}pp</span>` : `<span class="delta-negative">▼ ${dEff.toFixed(1)}pp</span>`;
+
+            document.getElementById('kpi-biomass').textContent = fmt(active.lenaActual, 0) + ' kg';
+            document.getElementById('bar-biomass').style.width = Math.min((active.lenaActual/current.lenaActual)*100, 100) + '%';
+            const dBio = ((active.lenaActual - current.lenaActual)/current.lenaActual*100);
+            document.getElementById('delta-biomass').innerHTML = dBio <= 0 ? `<span class="delta-positive">▼ ${Math.abs(dBio).toFixed(1)}% ahorro</span>` : `<span class="delta-negative">▲ ${dBio.toFixed(1)}% más</span>`;
+
+            document.getElementById('kpi-water').textContent = fmt(active.aguaRecuperada, 0) + ' L';
+            document.getElementById('bar-water').style.width = Math.min((active.aguaRecuperada/current.vaporGenerado)*100, 100) + '%';
+            const dWat = active.aguaRecuperada - current.aguaRecuperada;
+            document.getElementById('delta-water').innerHTML = dWat >= 0 ? `<span class="delta-positive">▲ +${fmt(dWat,0)} L rec.</span>` : `<span class="delta-negative">▼ ${fmt(dWat,0)} L</span>`;
+
+            document.getElementById('kpi-yield').textContent = BASE.yieldRate.toFixed(1) + '%';
+            document.getElementById('delta-yield').textContent = fmt(active.producto, 0) + ' kg prod.';
+
+            document.getElementById('sc-thermal-c').textContent = current.effThermal.toFixed(1) + '%';
+            document.getElementById('sc-biomass-c').textContent = fmt(current.lenaActual, 0);
+            document.getElementById('sc-water-c').textContent = fmt(current.aguaTotal, 0);
+            document.getElementById('sc-vapor-c').textContent = fmt(current.vaporGenerado, 0) + ' L';
+            document.getElementById('sc-yield-c').textContent = fmt(current.producto, 0) + ' kg';
+            document.getElementById('sc-cost-c').textContent = 'S/' + fmt(current.costoTotal, 0);
+
+            document.getElementById('sc-thermal-o').textContent = optimized.effThermal.toFixed(1) + '%';
+            document.getElementById('sc-biomass-o').textContent = fmt(optimized.lenaActual, 0);
+            document.getElementById('sc-water-o').textContent = fmt(optimized.aguaExterna, 0);
+            document.getElementById('sc-vapor-o').textContent = fmt(optimized.emisiones, 0) + ' L';
+            document.getElementById('sc-yield-o').textContent = fmt(optimized.producto, 0) + ' kg';
+            document.getElementById('sc-cost-o').textContent = 'S/' + fmt(optimized.costoTotal, 0);
+
+            document.getElementById('flow-algarroba').textContent = fmt(algarroba) + ' kg/sem';
+            document.getElementById('flow-producto').textContent = fmt(active.producto, 0) + ' kg/sem';
+            document.getElementById('flow-agua').textContent = fmt(active.aguaTotal, 0) + ' L/sem';
+            document.getElementById('flow-recovered').textContent = fmt(active.aguaRecuperada, 0) + ' L/sem';
+            document.getElementById('flow-emisiones').textContent = fmt(active.emisiones, 0) + ' L/sem';
+            document.getElementById('flow-fgr').textContent = currentScenario === 'optimized' ? 'FGR+CETV Activo' : 'Sin innovación';
+
+            document.getElementById('eco-trees').textContent = fmt(optimized.arbolesAhorrados, 1);
+            document.getElementById('eco-water').textContent = fmt(optimized.aguaRecuperada * 52, 0);
+            document.getElementById('eco-carbon').textContent = fmt(optimized.co2Ahorrado * 52, 0);
+
+            updateCharts(current, optimized);
+            updateSensitivity(current, optimized);
+        }
+
+        function updateCharts(current, optimized) {
+            const ids = ['efficiency','water','biomass','cost'];
+            ids.forEach(id => { if(charts[id]) charts[id].destroy(); });
+
+            charts.efficiency = new Chart(document.getElementById('chart-efficiency'), {
+                type: 'bar',
+                data: { labels: ['Actual', 'Optimizado'], datasets: [{ label: 'Eficiencia (%)', data: [current.effThermal, optimized.effThermal], backgroundColor: ['#e74c3c','#27ae60'], borderRadius: 6 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { title: { display: true, text: 'Eficiencia Térmica (%)', font: {size:12} } }, scales: { y: { beginAtZero: true, max: 60 } } }
+            });
+
+            charts.water = new Chart(document.getElementById('chart-water'), {
+                type: 'doughnut',
+                data: { labels: ['Recuperada','Externa','Emisiones'], datasets: [{ data: [optimized.aguaRecuperada, optimized.aguaExterna, optimized.emisiones], backgroundColor: ['#3498db','#f39c12','#e74c3c'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { title: { display: true, text: 'Balance Hídrico (L/sem)', font: {size:12} } } }
+            });
+
+            charts.biomass = new Chart(document.getElementById('chart-biomass'), {
+                type: 'bar',
+                data: { labels: ['Consumida','Ahorrada'], datasets: [{ label: 'kg/sem', data: [optimized.lenaActual, optimized.lenaAhorro], backgroundColor: ['#8B4513','#27ae60'], borderRadius: 6 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { title: { display: true, text: 'Biomasa (kg/sem)', font: {size:12} } } }
+            });
+
+            const ahorroSem = current.costoTotal - optimized.costoTotal;
+            charts.cost = new Chart(document.getElementById('chart-cost'), {
+                type: 'line',
+                data: { labels: ['Sem1','Sem4','Sem8','Sem12','Sem26','Sem39','Sem52'], datasets: [{ label: 'Ahorro Acum. (S/)', data: [0,ahorroSem*4,ahorroSem*8,ahorroSem*12,ahorroSem*26,ahorroSem*39,ahorroSem*52], borderColor: '#27ae60', backgroundColor: 'rgba(39,174,96,0.1)', fill: true, tension: 0.4 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { title: { display: true, text: 'Ahorro Acumulado Año 1 (S/)', font: {size:12} } } }
+            });
+        }
+
+        function updateSensitivity(current, optimized) {
+            const baseAhorro = (current.costoTotal - optimized.costoTotal) * 52;
+            const params = [
+                {name:'Precio Algarrobina', key:'precio', base:BASE.precio},
+                {name:'Costo Leña', key:'lenaCost', base:BASE.lenaCost},
+                {name:'Eficiencia FGR', key:'fgrBoost', base:BASE.fgrBoost},
+                {name:'Recuperación Agua', key:'condRecovery', base:BASE.condRecovery},
+                {name:'Carga Algarroba', key:'algarroba', base:BASE.algarroba}
+            ];
+
+            let html = '';
+            params.forEach(p => {
+                const vm = p.base * 0.8, vp = p.base * 1.2;
+                let simM, simP;
+                const args = [BASE.algarroba, BASE.dias, BASE.horas, BASE.effThermal, BASE.fgrBoost, BASE.cetvCapture, BASE.condRecovery, BASE.precio, BASE.lenaCost];
+                const idx = p.key==='precio'?7 : p.key==='lenaCost'?8 : p.key==='fgrBoost'?3 : p.key==='condRecovery'?5 : 0;
+                simM = calc(...args.slice(0,idx), vm, ...args.slice(idx+1));
+                simP = calc(...args.slice(0,idx), vp, ...args.slice(idx+1));
+
+                const am = (current.costoTotal - simM.costoTotal) * 52;
+                const ap = (current.costoTotal - simP.costoTotal) * 52;
+                const sens = Math.abs((ap - am) / baseAhorro * 100);
+                let badge = 'badge-good'; if(sens>30) badge='badge-bad'; else if(sens>15) badge='badge-warn';
+
+                html += `<tr><td><strong>${p.name}</strong></td><td>S/${fmt(am,0)}</td><td>S/${fmt(baseAhorro,0)}</td><td>S/${fmt(ap,0)}</td><td><span class="badge ${badge}">${sens.toFixed(1)}%</span></td></tr>`;
+            });
+            document.getElementById('sensitivity-body').innerHTML = html;
+        }
+
+        function showTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function generateReport() {
+            const algarroba = parseInt(document.getElementById('algarroba').value);
+            const dias = parseFloat(document.getElementById('dias').value);
+            const horas = parseInt(document.getElementById('horas').value);
+            const effBase = parseFloat(document.getElementById('eff-base').value);
+            const fgrBoost = parseFloat(document.getElementById('fgr-boost').value);
+            const cetvCapture = parseFloat(document.getElementById('cetv-capture').value);
+            const condRecovery = parseFloat(document.getElementById('cond-recovery').value);
+            const precio = parseFloat(document.getElementById('precio').value);
+            const lenaCost = parseFloat(document.getElementById('lena-cost').value);
+
+            const current = calc(algarroba, dias, horas, effBase, 0, 0, 0, precio, lenaCost);
+            const optimized = calc(algarroba, dias, horas, effBase, fgrBoost, cetvCapture, condRecovery, precio, lenaCost);
+            const ahorroSem = current.costoTotal - optimized.costoTotal;
+            const ahorroAnual = ahorroSem * 52;
+            const roi = (ahorroAnual / 150000) * 100;
+
+            const report = `═══════════════════════════════════════════════════════════════
+    REPORTE DE SIMULACIÓN - DERIVADOS DEL BOSQUE I E.I.R.L.
+    Planta Productiva · Chulucanas, Piura
+    Fecha: ${new Date().toLocaleDateString('es-PE')}
+═══════════════════════════════════════════════════════════════
+
+1. PARÁMETROS DE ENTRADA
+─────────────────────────────────────────────────────────────────
+  Carga de Algarroba:        ${fmt(algarroba)} kg/semana
+  Días Operativos:           ${dias} días/semana
+  Horas por Turno:           ${horas} horas
+  Eficiencia Térmica Base:   ${effBase}%
+  Precio Algarrobina:        S/${precio}/kg
+  Costo Leña:                S/${lenaCost}/kg
+
+2. CONFIGURACIÓN DE INNOVACIÓN
+─────────────────────────────────────────────────────────────────
+  FGR:  ${fgrBoost > 0 ? 'ACTIVO (' + fgrBoost + '% mejora)' : 'INACTIVO'}
+  CETV: ${cetvCapture > 0 ? 'ACTIVO (' + cetvCapture + '% captura)' : 'INACTIVO'}
+  Cond: ${condRecovery > 0 ? 'ACTIVO (' + condRecovery + '% recuperación)' : 'INACTIVO'}
+
+3. SISTEMA ACTUAL (LÍNEA BASE)
+─────────────────────────────────────────────────────────────────
+  Producción:        ${fmt(current.producto, 0)} kg/sem
+  Eficiencia:        ${current.effThermal.toFixed(1)}%
+  Leña:              ${fmt(current.lenaActual, 0)} kg/sem
+  Agua Proceso:      ${fmt(current.aguaTotal, 0)} L/sem
+  Vapor Perdido:     ${fmt(current.vaporGenerado, 0)} L/sem
+  Costo Energético:  S/${fmt(current.costoTotal, 0)}/sem
+
+4. SISTEMA OPTIMIZADO
+─────────────────────────────────────────────────────────────────
+  Producción:        ${fmt(optimized.producto, 0)} kg/sem
+  Eficiencia:        ${optimized.effThermal.toFixed(1)}%
+  Leña:              ${fmt(optimized.lenaActual, 0)} kg/sem
+  Agua Externa:      ${fmt(optimized.aguaExterna, 0)} L/sem
+  Agua Recuperada:   ${fmt(optimized.aguaRecuperada, 0)} L/sem
+  Emisiones:         ${fmt(optimized.emisiones, 0)} L/sem
+  Costo Energético:  S/${fmt(optimized.costoTotal, 0)}/sem
+
+5. INDICADORES DE IMPACTO
+─────────────────────────────────────────────────────────────────
+  Ahorro Semanal:     S/${fmt(ahorroSem, 0)}
+  Ahorro Anual:      S/${fmt(ahorroAnual, 0)}
+  Reducción Leña:    ${((current.lenaActual-optimized.lenaActual)/current.lenaActual*100).toFixed(1)}%
+  Recuperación Hídrica: ${(optimized.aguaRecuperada/current.vaporGenerado*100).toFixed(1)}%
+  Árboles/mes:       ${optimized.arbolesAhorrados.toFixed(1)}
+  CO₂ evitado/año:   ${fmt(optimized.co2Ahorrado*52, 0)} kg
+  ROI Estimado:      ${roi.toFixed(1)}%
+
+6. RECOMENDACIONES
+─────────────────────────────────────────────────────────────────
+  • Mantenimiento preventivo del separador ciclónico FGR
+  • Protocolo de limpieza neumática semanal
+  • Validar tratamiento de agua en CITE Agroindustrial
+  • Capacitar operarios en controles PLC
+  • Monitorear pH de condensados (AISI 316L)
+
+═══════════════════════════════════════════════════════════════`;
+
+            document.getElementById('report-content').textContent = report;
+            showTab('report');
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-btn')[3].classList.add('active');
+        }
+
+        window.onload = function() { setScenario('optimized'); };
+    </script>
+</body>
+</html>
